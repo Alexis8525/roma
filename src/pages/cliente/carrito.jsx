@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -10,16 +10,19 @@ import {
   FormControlLabel,
   Button,
   Divider,
-  Container // Importamos Container para controlar el ancho máximo
+  Container,
+  IconButton,
+  CircularProgress,
+  Alert
 } from "@mui/material";
-// Asegúrate de que los imports de otros componentes (como CardMedia para el ícono de tarjeta, si lo usas)
-// estén presentes si los necesitas.
+import DeleteIcon from '@mui/icons-material/Delete';
+import { ventaService } from "../../services/ventaService";
+import { productoService } from "../../services/productoService";
+import { authService } from "../../services/authService";
 
-// Componente para representar un producto en el carrito
-const ProductoItem = ({ name, description, price }) => (
+const ProductoItem = ({ producto, onEliminar, onActualizarCantidad }) => (
   <Box display="flex" justifyContent="space-between" alignItems="center" my={1.5}>
-    <Box display="flex" alignItems="center">
-      {/* Simulación del cuadro rosado del producto */}
+    <Box display="flex" alignItems="center" sx={{ flex: 1 }}>
       <Box
         sx={{
           width: 40,
@@ -27,44 +30,159 @@ const ProductoItem = ({ name, description, price }) => (
           backgroundColor: "#fbe4e7",
           borderRadius: 1,
           mr: 2,
-          flexShrink: 0, // Evita que se encoja
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden'
         }}
-      />
-      <Box sx={{ minWidth: 0 }}> {/* Agregamos minWidth: 0 para que el texto largo se trunque correctamente si es necesario */}
+      >
+        {producto.imagen ? (
+          <img 
+            src={`http://localhost:4000${producto.imagen}`} 
+            alt={producto.nombre}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            Img
+          </Typography>
+        )}
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography variant="body1" fontWeight="medium" noWrap>
-          {name}
+          {producto.nombre}
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap>
-          {description}
+          {producto.categoria || 'Sin categoría'}
         </Typography>
+        <Box display="flex" alignItems="center" mt={0.5}>
+          <IconButton 
+            size="small" 
+            onClick={() => onActualizarCantidad(producto._id, producto.cantidad - 1)}
+            disabled={producto.cantidad <= 1}
+          >
+            -
+          </IconButton>
+          <Typography variant="body2" sx={{ mx: 1 }}>
+            {producto.cantidad}
+          </Typography>
+          <IconButton 
+            size="small" 
+            onClick={() => onActualizarCantidad(producto._id, producto.cantidad + 1)}
+            disabled={producto.cantidad >= producto.stock}
+          >
+            +
+          </IconButton>
+        </Box>
       </Box>
     </Box>
-    <Typography variant="body1" fontWeight="bold" sx={{ ml: 1, flexShrink: 0 }}>
-      ${price}
-    </Typography>
+    <Box display="flex" alignItems="center">
+      <Typography variant="body1" fontWeight="bold" sx={{ ml: 1, mr: 2 }}>
+        ${(producto.precioVenta * producto.cantidad).toFixed(2)}
+      </Typography>
+      <IconButton 
+        size="small" 
+        onClick={() => onEliminar(producto._id)}
+        sx={{ color: 'error.main' }}
+      >
+        <DeleteIcon />
+      </IconButton>
+    </Box>
   </Box>
 );
 
 const Carrito = () => {
-  // Datos simulados del carrito
-  const productos = [
-    { name: "Producto con Descripción Larga", description: "Breve Desc", price: 10.0 },
-    { name: "Producto 2", description: "Breve Desc", price: 15.5 },
-    { name: "Producto 3", description: "Breve Desc", price: 5.0 },
-    { name: "Producto 4", description: "Breve Desc", price: 20.0 },
-    { name: "Producto 5", description: "Breve Desc", price: 8.75 },
-  ];
-  const subtotal = productos.reduce((sum, item) => sum + item.price, 0).toFixed(2);
-  const [deliveryType, setDeliveryType] = React.useState("store");
+  const [carrito, setCarrito] = useState([]);
+  const [deliveryType, setDeliveryType] = useState("store");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Cargar carrito desde localStorage al iniciar
+  useEffect(() => {
+    const carritoGuardado = localStorage.getItem('carrito');
+    if (carritoGuardado) {
+      setCarrito(JSON.parse(carritoGuardado));
+    }
+  }, []);
+
+  // Guardar carrito en localStorage cuando cambie
+  useEffect(() => {
+    localStorage.setItem('carrito', JSON.stringify(carrito));
+  }, [carrito]);
+
+  const subtotal = carrito.reduce((sum, item) => sum + (item.precioVenta * item.cantidad), 0);
+  const costoEnvio = deliveryType === 'home' ? 5.00 : 0;
+  const total = subtotal + costoEnvio;
+
+  const eliminarProducto = (productoId) => {
+    setCarrito(carrito.filter(item => item._id !== productoId));
+  };
+
+  const actualizarCantidad = (productoId, nuevaCantidad) => {
+    if (nuevaCantidad < 1) return;
+    
+    setCarrito(carrito.map(item => 
+      item._id === productoId 
+        ? { ...item, cantidad: nuevaCantidad }
+        : item
+    ));
+  };
+
+  const procesarPago = async () => {
+    if (carrito.length === 0) {
+      setError('El carrito está vacío');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const usuario = authService.getCurrentUser();
+      if (!usuario) {
+        setError('Debes iniciar sesión para realizar una compra');
+        return;
+      }
+
+      const ventaData = {
+        productos: carrito.map(item => ({
+          producto: item._id,
+          cantidad: item.cantidad,
+          precioUnitario: item.precioVenta,
+          subtotal: item.precioVenta * item.cantidad
+        })),
+        total: total,
+        cliente: usuario.id,
+        empleado: usuario.id, // En una app real, esto sería diferente
+        metodoPago: 'efectivo' // Por defecto
+      };
+
+      const response = await ventaService.createVenta(ventaData);
+      
+      if (response.data) {
+        // Limpiar carrito después de la compra exitosa
+        setCarrito([]);
+        localStorage.removeItem('carrito');
+        alert('¡Compra realizada exitosamente!');
+      }
+
+    } catch (err) {
+      setError('Error al procesar la compra: ' + (err.response?.data?.message || err.message));
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    // Utilizamos Container con maxWidth="xl" o false para un ancho muy amplio o completo
     <Container maxWidth={false} sx={{ py: 4, backgroundColor: "#f1f1f1", minHeight: "100vh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ ml: 3 }}>
         Pedido en Línea
       </Typography>
       
-      {/* El Grid container tiene un margen horizontal (mx: 3) para la vista móvil/tablet */}
+      {error && <Alert severity="error" sx={{ mb: 2, mx: 3 }}>{error}</Alert>}
+      
       <Grid container spacing={3} sx={{ mx: { xs: 0, md: 'auto' } }}> 
         
         {/* Columna Izquierda: Carrito */}
@@ -73,7 +191,7 @@ const Carrito = () => {
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" fontWeight="bold">
-                  Carrito
+                  Carrito ({carrito.length} productos)
                 </Typography>
                 <Typography variant="h6" fontWeight="bold">
                   Subtotal
@@ -81,22 +199,36 @@ const Carrito = () => {
               </Box>
               <Divider sx={{ mb: 1.5 }} />
               <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                {productos.map((prod, index) => (
-                  <ProductoItem
-                    key={index}
-                    name={prod.name}
-                    description={prod.description}
-                    price={prod.price}
-                  />
-                ))}
+                {carrito.length > 0 ? (
+                  carrito.map((producto) => (
+                    <ProductoItem
+                      key={producto._id}
+                      producto={producto}
+                      onEliminar={eliminarProducto}
+                      onActualizarCantidad={actualizarCantidad}
+                    />
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
+                    El carrito está vacío
+                  </Typography>
+                )}
               </Box>
             </CardContent>
-            {/* Pie del carrito: Total */}
             <CardContent sx={{ pt: 0 }}>
-              <Box display="flex" justifyContent="space-between" mt={1} pt={1} borderTop="1px solid #eee">
+              <Box display="flex" justifyContent="space-between" mb={1}>
+                <Typography variant="body2">Subtotal:</Typography>
+                <Typography variant="body2">${subtotal.toFixed(2)}</Typography>
+              </Box>
+              <Box display="flex" justifyContent="space-between" mb={1}>
+                <Typography variant="body2">Envío:</Typography>
+                <Typography variant="body2">${costoEnvio.toFixed(2)}</Typography>
+              </Box>
+              <Divider sx={{ my: 1 }} />
+              <Box display="flex" justifyContent="space-between" mt={1} pt={1}>
                 <Typography variant="h6">Total</Typography>
                 <Typography variant="h6" fontWeight="bold">
-                  ${subtotal}
+                  ${total.toFixed(2)}
                 </Typography>
               </Box>
             </CardContent>
@@ -105,7 +237,6 @@ const Carrito = () => {
 
         {/* Columna Central: Tipo de Entrega y Forma de Pago */}
         <Grid item xs={12} md={4}>
-          {/* Panel Tipo de Entrega */}
           <Card elevation={0} sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" mb={2}>
@@ -128,7 +259,7 @@ const Carrito = () => {
                     <Box component="span">
                       Entrega A Domicilio
                       <Typography variant="caption" color="text.secondary" ml={0.5}>
-                        (Costo Extra)
+                        (Costo Extra: $5.00)
                       </Typography>
                     </Box>
                   }
@@ -137,30 +268,27 @@ const Carrito = () => {
             </CardContent>
           </Card>
 
-          {/* Panel Forma de Pago */}
           <Card elevation={0}>
             <CardContent>
               <Typography variant="h6" fontWeight="bold" mb={2}>
                 Forma De Pago
               </Typography>
               <Box display="flex" flexDirection="column" alignItems="center" py={3}>
-                {/* Icono de tarjeta simulado */}
-                <Box mb={2}>
-                  
-                </Box>
                 <Button
                   variant="contained"
-                  fullWidth // Ocupa todo el ancho disponible del Card
+                  fullWidth
+                  disabled={carrito.length === 0 || loading}
+                  onClick={procesarPago}
                   sx={{
                     backgroundColor: "#fbe4e7",
                     color: "black",
                     "&:hover": { backgroundColor: "#f9d4da" },
-                    maxWidth: 300, // Limita el ancho del botón para que no se vea exagerado
+                    maxWidth: 300,
                     p: 1.5
                   }}
                   disableElevation
                 >
-                  Proceder Al Pago
+                  {loading ? <CircularProgress size={24} /> : 'Proceder Al Pago'}
                 </Button>
               </Box>
             </CardContent>
@@ -169,18 +297,37 @@ const Carrito = () => {
 
         {/* Columna Derecha: Confirmación de Pedido */}
         <Grid item xs={12} md={4}>
-          {/* Usamos sx={{ height: '100%' }} para que esta tarjeta se estire y se alinee verticalmente con las otras dos columnas si es necesario */}
           <Card elevation={0} sx={{ height: '100%' }}>
             <CardContent>
-              <Typography variant="h6" fontWeight="bold">
-                Confirmacion De Pedido
+              <Typography variant="h6" fontWeight="bold" mb={2}>
+                Confirmación De Pedido
               </Typography>
-              {/* Contenido de confirmación del pedido */}
-              <Box height="calc(100% - 40px)" display="flex" alignItems="center" justifyContent="center">
-                <Typography variant="body2" color="text.secondary">
-                  Aquí aparecerá el resumen final y los detalles de envío/pago.
-                </Typography>
-              </Box>
+              {carrito.length > 0 ? (
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Productos:</strong> {carrito.length}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Entrega:</strong> {deliveryType === 'store' ? 'Recoger en tienda' : 'A domicilio'}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Subtotal:</strong> ${subtotal.toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Envío:</strong> ${costoEnvio.toFixed(2)}
+                  </Typography>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="h6" gutterBottom>
+                    <strong>Total:</strong> ${total.toFixed(2)}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box height="calc(100% - 40px)" display="flex" alignItems="center" justifyContent="center">
+                  <Typography variant="body2" color="text.secondary">
+                    Agrega productos al carrito para ver el resumen
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

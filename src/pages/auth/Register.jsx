@@ -20,7 +20,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   // Compatibilidad con Vite y Create React App
-  const API_URL = process.env.REACT_APP_API_BASE_UR;
+  const API_URL = process.env.REACT_APP_API_BASE_URL;
   
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -38,7 +38,9 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${API_URL}/api/auth/register
+
+`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
