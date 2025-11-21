@@ -26,6 +26,9 @@ import {
   Person,
   Home,
   ExitToApp,
+  Coffee,
+  MenuBook,
+  LocalCafe,
 } from "@mui/icons-material";
 
 const menuItems = [
@@ -33,9 +36,9 @@ const menuItems = [
   { text: "Inventario", icon: <Inventory2 />, path: "/admin/inventario" },
   { text: "Ventas y Reportes", icon: <Assessment />, path: "/admin/ventas-reportes" },
   { text: "Control de Usuarios", icon: <People />, path: "/admin/control-usuarios" },
-  { text: "Administrar Recetas", icon: <RestaurantMenu />, path: "/admin/recetas" },
-  { text: "Proveedores y Compras", icon: <LocalShipping />, path: "/admin/proveedores" },
-  { text: "Productos", icon: <Person />, path: "/admin/perfil" },
+  { text: "Menú y Recetas", icon: <RestaurantMenu />, path: "/admin/recetas" },
+  { text: "Proveedores", icon: <LocalShipping />, path: "/admin/proveedores" },
+  { text: "Perfil", icon: <Person />, path: "/admin/perfil" },
 ];
 
 const AdminNavbar = ({ children }) => {
@@ -43,13 +46,11 @@ const AdminNavbar = ({ children }) => {
   const [usuario, setUsuario] = useState(null);
   const navigate = useNavigate();
 
-  // ✅ Cargar usuario logueado desde localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("usuario");
     if (storedUser) {
       setUsuario(JSON.parse(storedUser));
     } else {
-      // Si no hay usuario logueado, redirigir al login
       navigate("/login");
     }
   }, [navigate]);
@@ -57,7 +58,6 @@ const AdminNavbar = ({ children }) => {
   const handleMenu = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
 
-  // 🔒 Cerrar sesión
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
@@ -66,20 +66,23 @@ const AdminNavbar = ({ children }) => {
   };
 
   return (
-    <Box sx={{ height: "100vh", backgroundColor: "#f1f1f1" }}>
-      {/* Barra superior */}
+    <Box sx={{ height: "100vh", backgroundColor: "#f5f5f5" }}>
+      {/* Barra superior - Tema café */}
       <AppBar
         position="static"
         sx={{
-          backgroundColor: "#f8d7da",
-          color: "black",
+          backgroundColor: "#8B4513", // Café oscuro
+          color: "white",
           boxShadow: "none",
         }}
       >
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Typography variant="h6" fontWeight="bold">
-            Board <span style={{ marginLeft: "8px" }}>Fressísimo</span>
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <LocalCafe sx={{ fontSize: 28 }} />
+            <Typography variant="h6" fontWeight="bold">
+              RoMa Café
+            </Typography>
+          </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <IconButton color="inherit">
@@ -109,13 +112,13 @@ const AdminNavbar = ({ children }) => {
         <Drawer
           variant="permanent"
           sx={{
-            width: 220,
+            width: 240,
             flexShrink: 0,
             [`& .MuiDrawer-paper`]: {
-              width: 220,
+              width: 240,
               boxSizing: "border-box",
-              backgroundColor: "white",
-              borderRight: "1px solid #eee",
+              backgroundColor: "#fff",
+              borderRight: "1px solid #e0e0e0",
               top: "64px",
               height: "calc(100vh - 64px)",
             },
@@ -129,12 +132,17 @@ const AdminNavbar = ({ children }) => {
                   sx={{
                     borderRadius: 2,
                     my: 0.5,
-                    "&:hover": { backgroundColor: "#f8d7da" },
+                    "&:hover": { 
+                      backgroundColor: "#f3e5d8",
+                      color: "#8B4513"
+                    },
                   }}
                   component={Link}
                   to={item.path}
                 >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemIcon sx={{ color: "inherit" }}>
+                    {item.icon}
+                  </ListItemIcon>
                   <ListItemText primary={item.text} />
                 </ListItemButton>
               ))}
@@ -143,7 +151,13 @@ const AdminNavbar = ({ children }) => {
             <Divider sx={{ my: 2 }} />
 
             <ListItemButton
-              sx={{ borderRadius: 2 }}
+              sx={{ 
+                borderRadius: 2,
+                "&:hover": { 
+                  backgroundColor: "#ffebee",
+                  color: "#d32f2f"
+                }
+              }}
               onClick={handleLogout}
             >
               <ListItemIcon>
@@ -158,11 +172,12 @@ const AdminNavbar = ({ children }) => {
         <Box
           sx={{
             flexGrow: 1,
-            backgroundColor: "#f2edf0",
-            borderRadius: "0 0 10px 10px",
+            backgroundColor: "#fafafa",
+            borderRadius: "8px",
             m: 2,
-            p: 2,
+            p: 3,
             overflowY: "auto",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
           }}
         >
           {children}

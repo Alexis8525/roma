@@ -8,6 +8,7 @@ import {
   Button,
   Link,
 } from "@mui/material";
+import { LocalCafe } from "@mui/icons-material";
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -19,7 +20,6 @@ const Register = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Compatibilidad con Vite y Create React App
   const API_URL = process.env.REACT_APP_API_BASE_URL;
   
   const handleChange = (e) => {
@@ -38,16 +38,14 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/register
-
-`, {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: form.nombre,
           email: form.email,
           password: form.password,
-          rol: "cliente", // 👈 tipo de usuario fijo
+          rol: "cliente",
         }),
       });
 
@@ -59,12 +57,11 @@ const Register = () => {
 
       console.log("✅ Registro exitoso:", data);
 
-      // Guarda token y usuario
       localStorage.setItem("token", data.token);
       localStorage.setItem("usuario", JSON.stringify(data.usuario));
 
-      alert(`Bienvenido ${data.usuario.nombre} 🥳`);
-      window.location.href = "/"; // Redirige al inicio
+      alert(`Bienvenido a RoMa Café ${data.usuario.nombre} ☕`);
+      window.location.href = "/";
     } catch (err) {
       console.error("❌ Error al registrar:", err);
       setError(err.message);
@@ -80,27 +77,18 @@ const Register = () => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        background: "linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%)",
+        background: "linear-gradient(135deg, #f3e5d8 0%, #8B4513 100%)",
         p: 2,
       }}
     >
       <Card sx={{ width: 400, borderRadius: 4, boxShadow: 5 }}>
-        <CardContent sx={{ p: 4 }}>
-          <Typography
-            variant="h5"
-            fontWeight="bold"
-            textAlign="center"
-            gutterBottom
-          >
-            Crear Cuenta
+        <CardContent sx={{ p: 4, textAlign: 'center' }}>
+          <LocalCafe sx={{ fontSize: 48, color: '#8B4513', mb: 2 }} />
+          <Typography variant="h5" fontWeight="bold" gutterBottom>
+            Unirse a RoMa Café
           </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            textAlign="center"
-            mb={3}
-          >
-            Regístrate y empieza a usar Fressísimo 🍓
+          <Typography variant="body2" color="text.secondary" mb={3}>
+            Crea tu cuenta y vive la experiencia ☕
           </Typography>
 
           <form onSubmit={handleSubmit}>
@@ -156,19 +144,19 @@ const Register = () => {
               fullWidth
               disabled={loading}
               sx={{
-                backgroundColor: "#e91e63",
+                backgroundColor: "#8B4513",
                 py: 1.2,
                 fontWeight: "bold",
                 borderRadius: 3,
-                "&:hover": { backgroundColor: "#c2185b" },
+                "&:hover": { backgroundColor: "#654321" },
               }}
             >
-              {loading ? "Registrando..." : "Registrarme"}
+              {loading ? "Registrando..." : "Unirme a RoMa Café"}
             </Button>
 
             <Typography variant="body2" textAlign="center" sx={{ mt: 3 }}>
               ¿Ya tienes una cuenta?{" "}
-              <Link href="/login" underline="hover" color="#e91e63">
+              <Link href="/login" underline="hover" color="#8B4513">
                 Inicia sesión
               </Link>
             </Typography>
