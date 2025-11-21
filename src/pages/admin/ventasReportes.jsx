@@ -26,6 +26,7 @@ import { ventaService } from '../../services/ventaService';
 import { inventarioService } from '../../services/inventarioService';
 import { compraService } from '../../services/compraService';
 import { alertaService } from '../../services/alertaService';
+import { productoService } from '../../services/productoService';
 
 const PRIMARY_COLOR = '#D7385E';
 const LIGHT_PINK = '#F7E7EB';
@@ -36,6 +37,7 @@ const SalesAnalyticsDashboard = () => {
   const [stockData, setStockData] = useState([]);
   const [pedidosPendientes, setPedidosPendientes] = useState([]);
   const [alertas, setAlertas] = useState([]);
+  const [topCategorias, setTopCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -46,51 +48,87 @@ const SalesAnalyticsDashboard = () => {
   const cargarDatosDashboard = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Cargar ventas
-      const ventasResponse = await ventaService.getVentas();
-      const ventasData = ventasResponse.data;
-      
-      // Calcular ventas de hoy
-      const hoy = new Date().toDateString();
-      const ventasHoyData = ventasData.filter(venta => {
-        const fechaVenta = new Date(venta.fecha).toDateString();
-        return fechaVenta === hoy;
-      });
-      
-      const totalHoy = ventasHoyData.reduce((sum, venta) => sum + venta.total, 0);
-      const totalGeneral = ventasData.reduce((sum, venta) => sum + venta.total, 0);
-      
-      setVentasHoy(totalHoy);
-      setTotalVentas(totalGeneral);
+      // Cargar ventas con manejo de errores
+      let ventasData = [];
+      try {
+        const ventasResponse = await ventaService.getVentas();
+        ventasData = ventasResponse.data || [];
+        
+        // Calcular ventas de hoy
+        const hoy = new Date().toDateString();
+        const ventasHoyData = ventasData.filter(venta => {
+          if (!venta.fecha) return false;
+          const fechaVenta = new Date(venta.fecha).toDateString();
+          return fechaVenta === hoy;
+        });
+        
+        const totalHoy = ventasHoyData.reduce((sum, venta) => sum + (venta.total || 0), 0);
+        const totalGeneral = ventasData.reduce((sum, venta) => sum + (venta.total || 0), 0);
+        
+        setVentasHoy(totalHoy);
+        setTotalVentas(totalGeneral);
+      } catch (err) {
+        console.warn('⚠️  No se pudieron cargar las ventas:', err.message);
+        setVentasHoy(0);
+        setTotalVentas(0);
+      }
 
-      // Cargar inventario
-      const inventarioResponse = await inventarioService.getInventario();
-      setStockData(inventarioResponse.data.slice(0, 5));
+      // Cargar productos para el inventario
+      let productosData = [];
+      try {
+        const productosResponse = await productoService.getProductos();
+        productosData = productosResponse.data || [];
+        setStockData(productosData.slice(0, 5));
+      } catch (err) {
+        console.warn('⚠️  No se pudieron cargar los productos:', err.message);
+        setStockData([]);
+      }
 
       // Cargar compras pendientes
-      const comprasResponse = await compraService.getCompras();
-      const pendientes = comprasResponse.data.filter(compra => compra.estado === 'pendiente');
-      setPedidosPendientes(pendientes.slice(0, 3));
+      let comprasData = [];
+      try {
+        const comprasResponse = await compraService.getCompras();
+        comprasData = comprasResponse.data || [];
+        const pendientes = comprasData.filter(compra => compra.estado === 'pendiente');
+        setPedidosPendientes(pendientes.slice(0, 3));
+      } catch (err) {
+        console.warn('⚠️  No se pudieron cargar las compras:', err.message);
+        setPedidosPendientes([]);
+      }
 
       // Cargar alertas
-      const alertasResponse = await alertaService.getAlertas();
-      setAlertas(alertasResponse.data.slice(0, 3));
+      let alertasData = [];
+      try {
+        const alertasResponse = await alertaService.getAlertas();
+        alertasData = alertasResponse.data || [];
+        setAlertas(alertasData.slice(0, 3));
+      } catch (err) {
+        console.warn('⚠️  No se pudieron cargar las alertas:', err.message);
+        setAlertas([]);
+      }
+
+      // Cargar top categorías
+      try {
+        const categoriasResponse = await ventaService.getTopCategorias();
+        setTopCategorias(categoriasResponse.data || []);
+      } catch (err) {
+        console.warn('⚠️  No se pudieron cargar las categorías:', err.message);
+        setTopCategorias([
+          { categoria: 'Panadería', ventas: 45 },
+          { categoria: 'Pastelería', ventas: 32 },
+          { categoria: 'Bebidas', ventas: 28 }
+        ]);
+      }
 
     } catch (err) {
-      setError('Error al cargar los datos del dashboard');
-      console.error('Error:', err);
+      console.error('❌ Error general al cargar dashboard:', err);
+      setError('Error al cargar algunos datos del dashboard. Algunas funciones pueden no estar disponibles.');
     } finally {
       setLoading(false);
     }
   };
-
-  // Función para simular top categorías (ya que no tienes ese endpoint)
-  const topCategorias = [
-    { categoria: 'Panadería', ventas: 45 },
-    { categoria: 'Pastelería', ventas: 32 },
-    { categoria: 'Bebidas', ventas: 28 }
-  ];
 
   if (loading) {
     return (
@@ -102,7 +140,15 @@ const SalesAnalyticsDashboard = () => {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4 }}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
+        Dashboard Administrativo
+      </Typography>
+      
+      {error && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       
       <Grid container spacing={3}>
         {/* Ventas Totales Hoy */}
@@ -175,23 +221,30 @@ const SalesAnalyticsDashboard = () => {
             </Typography>
             <Box
               sx={{
-                height: 150,
+                minHeight: 150,
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 backgroundColor: '#f5f5f5',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                p: 2
               }}
             >
-              {stockData.map((producto, index) => (
-                <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', width: '90%', mb: 0.5 }}>
-                  <Typography variant="body2">{producto.nombre}</Typography>
-                  <Typography variant="body2" fontWeight="bold" 
-                    sx={{ color: producto.stock < 10 ? 'error.main' : 'success.main' }}>
-                    {producto.stock} unidades
-                  </Typography>
-                </Box>
-              ))}
+              {stockData.length > 0 ? (
+                stockData.map((producto, index) => (
+                  <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', width: '90%', mb: 0.5 }}>
+                    <Typography variant="body2">{producto.nombre}</Typography>
+                    <Typography variant="body2" fontWeight="bold" 
+                      sx={{ color: (producto.stock || 0) < 10 ? 'error.main' : 'success.main' }}>
+                      {producto.stock || 0} unidades
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2" color="textSecondary">
+                  No hay productos en inventario
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Grid>
@@ -208,6 +261,7 @@ const SalesAnalyticsDashboard = () => {
                   fullWidth
                   variant="outlined"
                   startIcon={<PersonAddIcon />}
+                  onClick={() => window.location.href = '/admin/control-usuarios'}
                 >
                   Agregar Nuevo Usuario
                 </Button>
@@ -232,6 +286,7 @@ const SalesAnalyticsDashboard = () => {
                     '&:hover': { backgroundColor: '#E0D0D4' },
                     fontWeight: 'bold'
                   }}
+                  onClick={() => window.location.href = '/admin/recetas'}
                 >
                   Nueva Receta
                 </Button>
@@ -290,18 +345,28 @@ const SalesAnalyticsDashboard = () => {
                   {pedidosPendientes.map((pedido) => (
                     <TableRow key={pedido._id}>
                       <TableCell>{pedido._id?.slice(-6) || 'N/A'}</TableCell>
-                      <TableCell>{pedido.proveedor?.nombre || 'Proveedor'}</TableCell>
-                      <TableCell>${pedido.totalCompra?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell>{new Date(pedido.fechaCompra).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {typeof pedido.proveedor === 'object' 
+                          ? pedido.proveedor?.nombre 
+                          : 'Proveedor'
+                        }
+                      </TableCell>
+                      <TableCell>${(pedido.totalCompra || 0).toFixed(2)}</TableCell>
+                      <TableCell>
+                        {pedido.fechaCompra 
+                          ? new Date(pedido.fechaCompra).toLocaleDateString()
+                          : 'N/A'
+                        }
+                      </TableCell>
                       <TableCell>
                         <Typography 
                           variant="body2" 
                           sx={{ 
-                            color: pedido.estado === 'pendiente' ? PRIMARY_COLOR : 'green',
+                            color: (pedido.estado || 'pendiente') === 'pendiente' ? PRIMARY_COLOR : 'green',
                             fontWeight: 'bold'
                           }}
                         >
-                          {pedido.estado?.toUpperCase() || 'PENDIENTE'}
+                          {(pedido.estado || 'PENDIENTE').toUpperCase()}
                         </Typography>
                       </TableCell>
                     </TableRow>

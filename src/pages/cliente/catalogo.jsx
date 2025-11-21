@@ -242,6 +242,8 @@ const Catalogo = () => {
         ))}
       </Box>
 
+      
+
       {/* Grid de Productos */}
       <Grid container spacing={2}>
         {productosFiltrados.map((producto) => (

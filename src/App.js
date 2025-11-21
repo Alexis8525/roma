@@ -47,7 +47,7 @@ const theme = createTheme({
 
 // Componente de protección de rutas
 const ProtectedRoute = ({ children, requiredRole }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
+  const user = JSON.parse(localStorage.getItem('usuario'));
   const token = localStorage.getItem('token');
 
   if (!token || !user) {
