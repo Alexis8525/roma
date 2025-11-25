@@ -1,192 +1,279 @@
-import React from "react";
-import {
-  Box,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
-  Button,
-  Divider,
-  Container // Importamos Container para controlar el ancho máximo
-} from "@mui/material";
-// Asegúrate de que los imports de otros componentes (como CardMedia para el ícono de tarjeta, si lo usas)
-// estén presentes si los necesitas.
+import React, { useState, useEffect } from 'react';
+import { 
+    Box, 
+    Typography, 
+    Paper, 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableContainer, 
+    TableHead, 
+    TableRow, 
+    Divider,
+    Grid,
+    List,
+    ListItemButton,
+    ListItemText,
+    Chip,
+    Button,
+    CircularProgress,
+    Alert
+} from '@mui/material';
+import { CreditCard, Money, ReceiptLong, CheckCircle } from '@mui/icons-material';
+import { ventaService } from '../../services/ventaService';
 
-// Componente para representar un producto en el carrito
-const ProductoItem = ({ name, description, price }) => (
-  <Box display="flex" justifyContent="space-between" alignItems="center" my={1.5}>
-    <Box display="flex" alignItems="center">
-      {/* Simulación del cuadro rosado del producto */}
-      <Box
-        sx={{
-          width: 40,
-          height: 40,
-          backgroundColor: "#fbe4e7",
-          borderRadius: 1,
-          mr: 2,
-          flexShrink: 0, // Evita que se encoja
-        }}
-      />
-      <Box sx={{ minWidth: 0 }}> {/* Agregamos minWidth: 0 para que el texto largo se trunque correctamente si es necesario */}
-        <Typography variant="body1" fontWeight="medium" noWrap>
-          {name}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {description}
-        </Typography>
-      </Box>
-    </Box>
-    <Typography variant="body1" fontWeight="bold" sx={{ ml: 1, flexShrink: 0 }}>
-      ${price}
-    </Typography>
-  </Box>
-);
-
-const Carrito = () => {
-  // Datos simulados del carrito
-  const productos = [
-    { name: "Producto con Descripción Larga", description: "Breve Desc", price: 10.0 },
-    { name: "Producto 2", description: "Breve Desc", price: 15.5 },
-    { name: "Producto 3", description: "Breve Desc", price: 5.0 },
-    { name: "Producto 4", description: "Breve Desc", price: 20.0 },
-    { name: "Producto 5", description: "Breve Desc", price: 8.75 },
-  ];
-  const subtotal = productos.reduce((sum, item) => sum + item.price, 0).toFixed(2);
-  const [deliveryType, setDeliveryType] = React.useState("store");
-
-  return (
-    // Utilizamos Container con maxWidth="xl" o false para un ancho muy amplio o completo
-    <Container maxWidth={false} sx={{ py: 4, backgroundColor: "#f1f1f1", minHeight: "100vh" }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ ml: 3 }}>
-        Pedido en Línea
-      </Typography>
-      
-      {/* El Grid container tiene un margen horizontal (mx: 3) para la vista móvil/tablet */}
-      <Grid container spacing={3} sx={{ mx: { xs: 0, md: 'auto' } }}> 
-        
-        {/* Columna Izquierda: Carrito */}
-        <Grid item xs={12} md={4}>
-          <Card elevation={0} sx={{ height: '100%' }}>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6" fontWeight="bold">
-                  Carrito
-                </Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  Subtotal
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 1.5 }} />
-              <Box sx={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                {productos.map((prod, index) => (
-                  <ProductoItem
-                    key={index}
-                    name={prod.name}
-                    description={prod.description}
-                    price={prod.price}
-                  />
-                ))}
-              </Box>
-            </CardContent>
-            {/* Pie del carrito: Total */}
-            <CardContent sx={{ pt: 0 }}>
-              <Box display="flex" justifyContent="space-between" mt={1} pt={1} borderTop="1px solid #eee">
-                <Typography variant="h6">Total</Typography>
-                <Typography variant="h6" fontWeight="bold">
-                  ${subtotal}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Columna Central: Tipo de Entrega y Forma de Pago */}
-        <Grid item xs={12} md={4}>
-          {/* Panel Tipo de Entrega */}
-          <Card elevation={0} sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Tipo De Entrega
-              </Typography>
-              <RadioGroup
-                value={deliveryType}
-                onChange={(e) => setDeliveryType(e.target.value)}
-                name="delivery-type-group"
-              >
-                <FormControlLabel
-                  value="store"
-                  control={<Radio />}
-                  label="Recoger En Tienda"
-                />
-                <FormControlLabel
-                  value="home"
-                  control={<Radio />}
-                  label={
-                    <Box component="span">
-                      Entrega A Domicilio
-                      <Typography variant="caption" color="text.secondary" ml={0.5}>
-                        (Costo Extra)
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
-          {/* Panel Forma de Pago */}
-          <Card elevation={0}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Forma De Pago
-              </Typography>
-              <Box display="flex" flexDirection="column" alignItems="center" py={3}>
-                {/* Icono de tarjeta simulado */}
-                <Box mb={2}>
-                  
-                </Box>
-                <Button
-                  variant="contained"
-                  fullWidth // Ocupa todo el ancho disponible del Card
-                  sx={{
-                    backgroundColor: "#fbe4e7",
-                    color: "black",
-                    "&:hover": { backgroundColor: "#f9d4da" },
-                    maxWidth: 300, // Limita el ancho del botón para que no se vea exagerado
-                    p: 1.5
-                  }}
-                  disableElevation
-                >
-                  Proceder Al Pago
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Columna Derecha: Confirmación de Pedido */}
-        <Grid item xs={12} md={4}>
-          {/* Usamos sx={{ height: '100%' }} para que esta tarjeta se estire y se alinee verticalmente con las otras dos columnas si es necesario */}
-          <Card elevation={0} sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" fontWeight="bold">
-                Confirmacion De Pedido
-              </Typography>
-              {/* Contenido de confirmación del pedido */}
-              <Box height="calc(100% - 40px)" display="flex" alignItems="center" justifyContent="center">
-                <Typography variant="body2" color="text.secondary">
-                  Aquí aparecerá el resumen final y los detalles de envío/pago.
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Container>
-  );
+// --- Íconos según el método de pago ---
+const getMetodoIcon = (metodo) => {
+    switch (metodo) {
+        case 'efectivo':
+            return <Money fontSize="small" />;
+        case 'tarjeta':
+            return <CreditCard fontSize="small" />;
+        default:
+            return <ReceiptLong fontSize="small" />;
+    }
 };
 
-export default Carrito;
+const ConsultaVentas = () => {
+    const [ventas, setVentas] = useState([]);
+    const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        cargarVentas();
+    }, []);
+
+    const cargarVentas = async () => {
+        try {
+            setLoading(true);
+            const response = await ventaService.getVentas();
+            if (response.data) {
+                setVentas(response.data);
+                if (response.data.length > 0) {
+                    setVentaSeleccionada(response.data[0]);
+                }
+            }
+        } catch (err) {
+            console.error('Error al cargar ventas:', err);
+            setError('Error al cargar las ventas: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    return (
+        <Box sx={{ p: 3, backgroundColor: 'white', borderRadius: 2, boxShadow: 3 }}>
+            <Typography variant="h4" fontWeight="bold" mb={1}>
+                Consulta de Ventas (Historial)
+            </Typography>
+            <Typography variant="h6" color="text.secondary" mb={3}>
+                Selecciona una venta para ver el detalle
+            </Typography>
+
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+            <Grid container spacing={3}>
+                {/* 🧾 Columna Izquierda: Lista de Ventas */}
+                <Grid item xs={12} md={4}>
+                    <Paper elevation={1} sx={{ p: 1, minHeight: 500, backgroundColor: '#fdf3f5' }}>
+                        <Typography variant="subtitle1" fontWeight="bold" p={1}>
+                            Ventas Recientes ({ventas.length})
+                        </Typography>
+                        <Divider sx={{ mb: 1 }} />
+
+                        <List disablePadding>
+                            {ventas.map((venta) => (
+                                <ListItemButton
+                                    key={venta._id}
+                                    selected={ventaSeleccionada && venta._id === ventaSeleccionada._id}
+                                    onClick={() => setVentaSeleccionada(venta)}
+                                    sx={{ 
+                                        borderRadius: 1, 
+                                        my: 0.5,
+                                        '&.Mui-selected': {
+                                            backgroundColor: '#fbe4e7',
+                                            '&:hover': { backgroundColor: '#f9d4da' }
+                                        }
+                                    }}
+                                >
+                                    <ListItemText 
+                                        primary={`Venta #${venta._id.slice(-6)}`} 
+                                        secondary={`Total: $${venta.total?.toFixed(2) || '0.00'} — ${new Date(venta.fecha).toLocaleDateString()}`} 
+                                    />
+                                    <Chip 
+                                        label={venta.metodoPago} 
+                                        size="small"
+                                        icon={getMetodoIcon(venta.metodoPago)}
+                                        sx={{ backgroundColor: '#f7c0c9', color: 'black' }}
+                                    />
+                                </ListItemButton>
+                            ))}
+                        </List>
+
+                        {ventas.length === 0 && (
+                            <Box textAlign="center" py={4}>
+                                <Typography variant="body2" color="text.secondary">
+                                    No hay ventas registradas
+                                </Typography>
+                            </Box>
+                        )}
+                    </Paper>
+                </Grid>
+
+                {/* 💳 Columna Derecha: Detalle de la Venta Seleccionada */}
+                <Grid item xs={12} md={8}>
+                    {ventaSeleccionada ? (
+                        <Paper elevation={1} sx={{ p: 3, minHeight: 500 }}>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    mb: 2
+                                }}
+                            >
+                                <Typography variant="h5" fontWeight="bold">
+                                    Detalle Venta #{ventaSeleccionada._id.slice(-6)}
+                                </Typography>
+                                <Chip 
+                                    label={ventaSeleccionada.estado} 
+                                    icon={<CheckCircle />}
+                                    color="success"
+                                    size="medium"
+                                />
+                            </Box>
+
+                            <Divider sx={{ mb: 3 }} />
+
+                            <Grid container spacing={3}>
+                                {/* 🛒 Desglose de productos */}
+                                <Grid item xs={12} lg={7}>
+                                    <Typography variant="h6" mb={2}>Productos Vendidos</Typography>
+                                    <TableContainer component={Paper} elevation={0}>
+                                        <Table size="small">
+                                            <TableHead sx={{ backgroundColor: '#fbe4e7' }}>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 'bold' }}>Producto</TableCell>
+                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Cant.</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Precio U.</TableCell>
+                                                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Subtotal</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {ventaSeleccionada.productos?.map((item, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>
+                                                            {typeof item.producto === 'object' 
+                                                                ? item.producto?.nombre 
+                                                                : `Producto ${index + 1}`
+                                                            }
+                                                        </TableCell>
+                                                        <TableCell align="center">{item.cantidad}</TableCell>
+                                                        <TableCell align="right">${item.precioUnitario?.toFixed(2)}</TableCell>
+                                                        <TableCell align="right">
+                                                            ${(item.precioUnitario * item.cantidad)?.toFixed(2)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Grid>
+
+                                {/* 💰 Resumen de pago */}
+                                <Grid item xs={12} lg={5}>
+                                    <Paper sx={{ p: 2, backgroundColor: '#fdf3f5', border: '1px solid #f9d4da' }}>
+                                        <Typography variant="h6" fontWeight="bold" mb={2}>
+                                            Información de Pago
+                                        </Typography>
+
+                                        <Box mb={2}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Fecha y Hora:
+                                            </Typography>
+                                            <Typography fontWeight="bold">
+                                                {new Date(ventaSeleccionada.fecha).toLocaleString()}
+                                            </Typography>
+                                        </Box>
+
+                                        <Box mb={2}>
+                                            <Typography variant="subtitle2" color="text.secondary">
+                                                Método de Pago:
+                                            </Typography>
+                                            <Typography fontWeight="bold" display="flex" alignItems="center" gap={1}>
+                                                {getMetodoIcon(ventaSeleccionada.metodoPago)} 
+                                                {ventaSeleccionada.metodoPago}
+                                            </Typography>
+                                        </Box>
+
+                                        <Divider sx={{ my: 2 }} />
+
+                                        <Typography variant="h6" fontWeight="bold" mb={2}>
+                                            Resumen Financiero
+                                        </Typography>
+
+                                        <Box display="flex" justifyContent="space-between" mb={1}>
+                                            <Typography>Subtotal:</Typography>
+                                            <Typography fontWeight="bold">
+                                                ${ventaSeleccionada.productos?.reduce((sum, item) => sum + (item.precioUnitario * item.cantidad), 0)?.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+
+                                        <Divider sx={{ my: 1 }} />
+
+                                        <Box display="flex" justifyContent="space-between">
+                                            <Typography variant="h6">TOTAL PAGADO:</Typography>
+                                            <Typography variant="h6" fontWeight="bold" color="error.main">
+                                                ${ventaSeleccionada.total?.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                    </Paper>
+
+                                    <Button
+                                        fullWidth
+                                        variant="outlined"
+                                        sx={{
+                                            mt: 3,
+                                            color: '#e91e63',
+                                            borderColor: '#f7c0c9',
+                                            fontWeight: 'bold',
+                                            '&:hover': { borderColor: '#f9d4da', backgroundColor: '#fce4ec' }
+                                        }}
+                                    >
+                                        Imprimir Recibo
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    ) : (
+                        <Paper
+                            elevation={1}
+                            sx={{
+                                p: 3,
+                                minHeight: 500,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <Typography variant="h6" color="text.secondary">
+                                Selecciona una venta del historial para ver su detalle.
+                            </Typography>
+                        </Paper>
+                    )}
+                </Grid>
+            </Grid>
+        </Box>
+    );
+};
+
+export default ConsultaVentas;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -15,92 +15,71 @@ import {
   TextField,
   InputAdornment,
   Button,
+  CircularProgress,
+  Alert
 } from "@mui/material";
-import { Search, Inventory2, AddCircle } from "@mui/icons-material";
-
-// --- Datos Simulados de Inventario ---
-const productosInventario = [
-  {
-    id: 1,
-    nombre: "Fresa Fresca",
-    categoria: "Fruta",
-    cantidad: 35,
-    unidad: "kg",
-    precio: 12.5,
-    proveedor: "Proveedor A",
-    estado: "Suficiente",
-  },
-  {
-    id: 2,
-    nombre: "Mango Ataulfo",
-    categoria: "Fruta",
-    cantidad: 8,
-    unidad: "kg",
-    precio: 15.8,
-    proveedor: "Proveedor B",
-    estado: "Bajo",
-  },
-  {
-    id: 3,
-    nombre: "Leche Entera",
-    categoria: "Lácteos",
-    cantidad: 0,
-    unidad: "lt",
-    precio: 18.2,
-    proveedor: "Proveedor C",
-    estado: "Agotado",
-  },
-  {
-    id: 4,
-    nombre: "Azúcar Morena",
-    categoria: "Endulzante",
-    cantidad: 22,
-    unidad: "kg",
-    precio: 9.5,
-    proveedor: "Proveedor D",
-    estado: "Suficiente",
-  },
-  {
-    id: 5,
-    nombre: "Miel Natural",
-    categoria: "Endulzante",
-    cantidad: 4,
-    unidad: "lt",
-    precio: 30.0,
-    proveedor: "Proveedor D",
-    estado: "Bajo",
-  },
-];
+import { Search, Inventory2, AddCircle, Warning } from "@mui/icons-material";
+import { productoService } from "../../services/productoService";
 
 // --- Función para color del estado ---
-const getEstadoColor = (estado) => {
-  switch (estado) {
-    case "Suficiente":
-      return "success";
-    case "Bajo":
-      return "warning";
-    case "Agotado":
-      return "error";
-    default:
-      return "default";
-  }
+const getEstadoColor = (stock) => {
+  if (stock === 0) return "error";
+  if (stock < 10) return "warning";
+  return "success";
+};
+
+const getEstadoTexto = (stock) => {
+  if (stock === 0) return "Agotado";
+  if (stock < 10) return "Bajo";
+  return "Suficiente";
 };
 
 const InventarioProductos = () => {
   const [busqueda, setBusqueda] = useState("");
-  const [productos, setProductos] = useState(productosInventario);
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    cargarProductos();
+  }, []);
+
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      const response = await productoService.getProductos();
+      if (response.data) {
+        setProductos(response.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar productos:', err);
+      setError('Error al cargar el inventario: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBuscar = (e) => {
     const valor = e.target.value.toLowerCase();
     setBusqueda(valor);
-    const filtrados = productosInventario.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(valor) ||
-        p.categoria.toLowerCase().includes(valor) ||
-        p.proveedor.toLowerCase().includes(valor)
-    );
-    setProductos(filtrados);
   };
+
+  const productosFiltrados = productos.filter(
+    (p) =>
+      p.nombre.toLowerCase().includes(busqueda) ||
+      (p.categoria && p.categoria.toLowerCase().includes(busqueda))
+  );
+
+  const productosBajoStock = productos.filter(p => p.stock < 10);
+  const productosAgotados = productos.filter(p => p.stock === 0);
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3, backgroundColor: "white", borderRadius: 2, boxShadow: 3 }}>
@@ -110,6 +89,8 @@ const InventarioProductos = () => {
       <Typography variant="h6" color="text.secondary" mb={3}>
         Control y seguimiento de existencias actuales
       </Typography>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {/* 🔍 Barra de búsqueda y botón */}
       <Box
@@ -121,7 +102,7 @@ const InventarioProductos = () => {
         }}
       >
         <TextField
-          placeholder="Buscar por nombre, categoría o proveedor..."
+          placeholder="Buscar por nombre o categoría..."
           variant="outlined"
           value={busqueda}
           onChange={handleBuscar}
@@ -160,19 +141,14 @@ const InventarioProductos = () => {
         <Table>
           <TableHead sx={{ backgroundColor: "#fbe4e7" }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>ID</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Producto</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Categoría</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Cantidad
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Unidad
+                Stock
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Precio Unitario ($)
+                Precio Venta ($)
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Proveedor</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
                 Estado
               </TableCell>
@@ -180,32 +156,30 @@ const InventarioProductos = () => {
           </TableHead>
 
           <TableBody>
-            {productos.map((p) => (
+            {productosFiltrados.map((p) => (
               <TableRow
-                key={p.id}
+                key={p._id}
                 hover
                 sx={{
                   "&:hover": { backgroundColor: "#fef2f4" },
                 }}
               >
-                <TableCell>{p.id}</TableCell>
                 <TableCell>
                   <Box display="flex" alignItems="center" gap={1}>
                     <Inventory2 fontSize="small" color="action" />
                     {p.nombre}
                   </Box>
                 </TableCell>
-                <TableCell>{p.categoria}</TableCell>
-                <TableCell align="center">{p.cantidad}</TableCell>
-                <TableCell align="center">{p.unidad}</TableCell>
-                <TableCell align="right">${p.precio.toFixed(2)}</TableCell>
-                <TableCell>{p.proveedor}</TableCell>
+                <TableCell>{p.categoria || 'Sin categoría'}</TableCell>
+                <TableCell align="center">{p.stock || 0}</TableCell>
+                <TableCell align="right">${p.precioVenta?.toFixed(2) || '0.00'}</TableCell>
                 <TableCell align="center">
                   <Chip
-                    label={p.estado}
-                    color={getEstadoColor(p.estado)}
+                    label={getEstadoTexto(p.stock)}
+                    color={getEstadoColor(p.stock)}
                     variant="outlined"
                     size="small"
+                    icon={p.stock < 10 ? <Warning /> : undefined}
                   />
                 </TableCell>
               </TableRow>
@@ -213,6 +187,14 @@ const InventarioProductos = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {productosFiltrados.length === 0 && (
+        <Box textAlign="center" py={4}>
+          <Typography variant="h6" color="text.secondary">
+            No se encontraron productos
+          </Typography>
+        </Box>
+      )}
 
       {/* 📊 Resumen general */}
       <Divider sx={{ my: 3 }} />
@@ -222,7 +204,7 @@ const InventarioProductos = () => {
             <Typography variant="h6" fontWeight="bold">
               Total de Productos
             </Typography>
-            <Typography variant="h4" color="error.main">
+            <Typography variant="h4" color="primary.main">
               {productos.length}
             </Typography>
           </Paper>
@@ -234,7 +216,7 @@ const InventarioProductos = () => {
               Productos con Stock Bajo
             </Typography>
             <Typography variant="h4" color="warning.main">
-              {productos.filter((p) => p.estado === "Bajo").length}
+              {productosBajoStock.length}
             </Typography>
           </Paper>
         </Grid>
@@ -245,7 +227,7 @@ const InventarioProductos = () => {
               Productos Agotados
             </Typography>
             <Typography variant="h4" color="error.main">
-              {productos.filter((p) => p.estado === "Agotado").length}
+              {productosAgotados.length}
             </Typography>
           </Paper>
         </Grid>

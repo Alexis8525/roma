@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -14,6 +14,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  CircularProgress,
+  Alert
 } from "@mui/material";
 import {
   AttachMoney,
@@ -21,64 +23,82 @@ import {
   LocalShipping,
   FilterList,
 } from "@mui/icons-material";
+import { ventaService } from "../../services/ventaService";
 
-// --- Datos Simulados ---
-const datosVentas = [
-  {
-    fechaHora: "2025-10-31 10:00",
-    ticket: "0001",
-    metodo: "Efectivo",
-    total: 12.5,
-    productos: 1,
-  },
-  {
-    fechaHora: "2025-10-31 10:30",
-    ticket: "0002",
-    metodo: "Tarjeta",
-    total: 25.0,
-    productos: 2,
-  },
-  {
-    fechaHora: "2025-10-30 15:45",
-    ticket: "0003",
-    metodo: "Transferencia",
-    total: 45.99,
-    productos: 3,
-  },
-  {
-    fechaHora: "2025-10-30 18:20",
-    ticket: "0004",
-    metodo: "Efectivo",
-    total: 5.0,
-    productos: 1,
-  },
-  {
-    fechaHora: "2025-10-29 12:00",
-    ticket: "0005",
-    metodo: "Tarjeta",
-    total: 10.99,
-    productos: 1,
-  },
-];
+// --- Componente de Tarjeta ---
+const MetricaCard = ({ title, value, subTitle, icon: IconComponent, color }) => (
+  <Paper
+    elevation={3}
+    sx={{
+      p: 2,
+      backgroundColor: color,
+      color: "white",
+      borderRadius: 2,
+      minHeight: 120,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+    }}
+  >
+    <Box display="flex" justifyContent="space-between" alignItems="center">
+      <Typography variant="body1" fontWeight="medium">
+        {title}
+      </Typography>
+      {IconComponent && <IconComponent sx={{ fontSize: 36, opacity: 0.8 }} />}
+    </Box>
+    <Box>
+      <Typography variant="h4" fontWeight="bold">
+        {value}
+      </Typography>
+      <Typography variant="caption" sx={{ opacity: 0.8 }}>
+        {subTitle}
+      </Typography>
+    </Box>
+  </Paper>
+);
 
-// --- Cálculo de Métricas ---
-const calcularMetricas = (ventas) => {
-  const ventasTotales = ventas.reduce((sum, v) => sum + v.total, 0);
-  const numTransacciones = ventas.length;
-  const ventaPromedio = numTransacciones > 0 ? ventasTotales / numTransacciones : 0;
-
-  return {
-    ventasTotales: ventasTotales.toFixed(2),
-    numTransacciones,
-    ventaPromedio: ventaPromedio.toFixed(2),
-  };
-};
-
-// --- Componente Principal ---
 const DashboardVentas = () => {
   const [periodo, setPeriodo] = useState("dia");
-  const [ventasFiltradas] = useState(datosVentas);
-  const metricas = calcularMetricas(ventasFiltradas);
+  const [ventas, setVentas] = useState([]);
+  const [metricas, setMetricas] = useState({
+    ventasTotales: "0.00",
+    numTransacciones: 0,
+    ventaPromedio: "0.00"
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    cargarVentas();
+  }, []);
+
+  const cargarVentas = async () => {
+    try {
+      setLoading(true);
+      const response = await ventaService.getVentas();
+      if (response.data) {
+        setVentas(response.data);
+        calcularMetricas(response.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar ventas:', err);
+      setError('Error al cargar los reportes: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calcularMetricas = (ventasData) => {
+    const ventasTotales = ventasData.reduce((sum, v) => sum + (v.total || 0), 0);
+    const numTransacciones = ventasData.length;
+    const ventaPromedio = numTransacciones > 0 ? ventasTotales / numTransacciones : 0;
+
+    setMetricas({
+      ventasTotales: ventasTotales.toFixed(2),
+      numTransacciones,
+      ventaPromedio: ventaPromedio.toFixed(2),
+    });
+  };
 
   const getPeriodoLabel = () => {
     switch (periodo) {
@@ -95,37 +115,13 @@ const DashboardVentas = () => {
     }
   };
 
-  // --- Componente de Tarjeta ---
-  const MetricaCard = ({ title, value, subTitle, icon: IconComponent, color }) => (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 2,
-        backgroundColor: color,
-        color: "white",
-        borderRadius: 2,
-        minHeight: 120,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-      }}
-    >
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Typography variant="body1" fontWeight="medium">
-          {title}
-        </Typography>
-        {IconComponent && <IconComponent sx={{ fontSize: 36, opacity: 0.8 }} />}
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress />
       </Box>
-      <Box>
-        <Typography variant="h4" fontWeight="bold">
-          {value}
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.8 }}>
-          {subTitle}
-        </Typography>
-      </Box>
-    </Paper>
-  );
+    );
+  }
 
   return (
     <Box
@@ -140,6 +136,8 @@ const DashboardVentas = () => {
         width: "100%",
       }}
     >
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      
       {/* Izquierda: Métricas */}
       <Box sx={{ flex: 1.2 }}>
         <Typography variant="h4" fontWeight="bold" mb={2}>
@@ -229,14 +227,14 @@ const DashboardVentas = () => {
         {/* Tabla */}
         <Paper elevation={1} sx={{ p: 3, flex: 1 }}>
           <Typography variant="h6" fontWeight="bold" mb={2}>
-            Desglose de Transacciones
+            Desglose de Transacciones ({ventas.length})
           </Typography>
           <TableContainer sx={{ maxHeight: 300 }}>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow sx={{ backgroundColor: "#f8d7da" }}>
                   <TableCell sx={{ fontWeight: "bold" }}>Fecha/Hora</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Ticket No.</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>ID Venta</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Método Pago</TableCell>
                   <TableCell align="right" sx={{ fontWeight: "bold" }}>
                     TOTAL
@@ -244,21 +242,28 @@ const DashboardVentas = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {ventasFiltradas.map((venta) => (
-                  <TableRow key={venta.ticket} hover>
+                {ventas.slice(0, 10).map((venta) => (
+                  <TableRow key={venta._id} hover>
                     <TableCell>
-                      {venta.fechaHora.split(" ")[0]} / {venta.fechaHora.split(" ")[1]}
+                      {new Date(venta.fecha).toLocaleDateString()} / {new Date(venta.fecha).toLocaleTimeString()}
                     </TableCell>
-                    <TableCell>{venta.ticket}</TableCell>
-                    <TableCell>{venta.metodo}</TableCell>
+                    <TableCell>{venta._id.slice(-6)}</TableCell>
+                    <TableCell>{venta.metodoPago}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                      ${venta.total.toFixed(2)}
+                      ${venta.total?.toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
+          {ventas.length === 0 && (
+            <Box textAlign="center" py={2}>
+              <Typography variant="body2" color="text.secondary">
+                No hay ventas registradas
+              </Typography>
+            </Box>
+          )}
         </Paper>
       </Box>
     </Box>
