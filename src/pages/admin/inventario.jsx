@@ -18,117 +18,100 @@ import {
   CircularProgress,
   Alert,
   IconButton,
+  MenuItem,
+  Snackbar,
+  Card,
+  CardContent,
+  Select,
+  FormControl,
+  InputLabel,
+  Modal,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
-  MenuItem,
-  Snackbar,
-  Modal
+  DialogActions
 } from "@mui/material";
 import { 
   Search, 
-  Inventory2, 
+  LocalGroceryStore, 
   AddCircle, 
   Warning,
   Edit,
   Delete,
   Refresh,
+  TrendingUp,
+  TrendingDown,
+  Equalizer,
+  CalendarToday,
+  Inventory,
+  AttachMoney,
+  Speed,
   Close
 } from "@mui/icons-material";
 
 // Función para color del estado
-const getEstadoColor = (stock) => {
+const getEstadoColor = (stock, stockMinimo) => {
   if (stock === 0) return "error";
-  if (stock < 10) return "warning";
+  if (stock < stockMinimo) return "warning";
   return "success";
 };
 
-const getEstadoTexto = (stock) => {
-  if (stock === 0) return "Agotado";
-  if (stock < 10) return "Bajo";
-  return "Suficiente";
-};
-
-// Estilo para el modal
-const modalStyle = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: { xs: "90%", sm: 450, md: 550 },
-  bgcolor: "background.paper",
-  borderRadius: 2,
-  boxShadow: 24,
-  p: 4,
-  border: "4px solid #fbe4e7",
+const getEstadoTexto = (stock, stockMinimo) => {
+  if (stock === 0) return "AGOTADO";
+  if (stock < stockMinimo) return "BAJO STOCK";
+  return "SUFICIENTE";
 };
 
 const API_BASE = "http://localhost:4000";
 
-// --- MODAL DE CREAR/EDITAR ---
-const CreateProductModal = ({ open, handleClose, onSave, producto }) => {
+// --- MODAL PARA CREAR/EDITAR MATERIA PRIMA ---
+const MateriaPrimaModal = ({ open, handleClose, onSave, materiaPrima }) => {
   const [form, setForm] = useState({
     nombre: "",
     categoria: "",
-    precioVenta: "",
+    unidadMedida: "",
     stock: "",
-    proveedor: "",
-    imagen: null,
+    stockMinimo: "",
+    precioPromedioUnitario: "",
   });
-  const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Categorías disponibles
   const categorias = [
-    "Bebidas",
-    "Bebidas Calientes",
-    "Bebidas Frías", 
-    "Panadería",
-    "Pastelería",
-    "Sandwiches",
-    "Ensaladas",
-    "Snacks",
-    "Otros"
+    "Lácteos", "Carnes", "Frutas", "Verduras", "Granos", 
+    "Especias", "Bebidas", "Panadería", "Limpieza", "Otros"
+  ];
+
+  const unidadesMedida = [
+    "kg", "g", "l", "ml", "pza", "lt", "bolsa", "caja", "paquete"
   ];
 
   useEffect(() => {
-    if (producto) {
-      // Modo edición
+    if (materiaPrima) {
       setForm({
-        nombre: producto.nombre || "",
-        categoria: producto.categoria || "",
-        precioVenta: producto.precioVenta || "",
-        stock: producto.stock || "",
-        proveedor: producto.proveedor || "",
-        imagen: null,
+        nombre: materiaPrima.nombre || "",
+        categoria: materiaPrima.categoria || "",
+        unidadMedida: materiaPrima.unidadMedida || "",
+        stock: materiaPrima.stock || "",
+        stockMinimo: materiaPrima.stockMinimo || "",
+        precioPromedioUnitario: materiaPrima.precioPromedioUnitario || "",
       });
-      setPreview(producto.imagen ? `${API_BASE}${producto.imagen}` : null);
     } else {
-      // Modo creación
       setForm({
         nombre: "",
         categoria: "",
-        precioVenta: "",
+        unidadMedida: "",
         stock: "",
-        proveedor: "",
-        imagen: null,
+        stockMinimo: "",
+        precioPromedioUnitario: "",
       });
-      setPreview(null);
     }
     setError("");
-  }, [open, producto]);
+  }, [open, materiaPrima]);
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === "imagen") {
-      const file = files[0];
-      setForm({ ...form, imagen: file });
-      setPreview(URL.createObjectURL(file));
-    } else {
-      setForm({ ...form, [name]: value });
-    }
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
   };
 
   const handleSubmit = async (e) => {
@@ -137,93 +120,71 @@ const CreateProductModal = ({ open, handleClose, onSave, producto }) => {
     setError("");
 
     try {
-      // Validaciones básicas
-      if (!form.nombre.trim()) {
-        throw new Error("El nombre del producto es requerido");
-      }
-      if (!form.categoria) {
-        throw new Error("La categoría es requerida");
-      }
-      if (!form.precioVenta || form.precioVenta <= 0) {
-        throw new Error("El precio de venta debe ser mayor a 0");
-      }
-      if (!form.stock || form.stock < 0) {
-        throw new Error("El stock no puede ser negativo");
-      }
+      if (!form.nombre.trim()) throw new Error("El nombre es requerido");
+      if (!form.unidadMedida) throw new Error("La unidad de medida es requerida");
+      if (!form.stock || form.stock < 0) throw new Error("El stock no puede ser negativo");
+      if (!form.stockMinimo || form.stockMinimo < 0) throw new Error("El stock mínimo no puede ser negativo");
 
-      const formData = new FormData();
+      const token = localStorage.getItem("token");
       
-      // Agregar campos del formulario usando el mismo método que funciona
-      for (const key in form) {
-        if (form[key] !== null && form[key] !== undefined) {
-          formData.append(key, form[key]);
-        }
-      }
+      // RUTA CORREGIDA: usa /api/materias-primas (con guión y en plural)
+      const url = materiaPrima 
+        ? `${API_BASE}/api/materias-primas/${materiaPrima._id}`
+        : `${API_BASE}/api/materias-primas`;
+      
+      const method = materiaPrima ? "PUT" : "POST";
 
-      const url = producto
-        ? `${API_BASE}/api/productos/${producto._id}`
-        : `${API_BASE}/api/productos`;
-      const method = producto ? "PUT" : "POST";
+      console.log("📤 Enviando a:", url, "Método:", method);
+      console.log("📦 Datos:", form);
 
-      console.log("📤 Enviando producto:", {
-        url,
+      const res = await fetch(url, {
         method,
-        datos: Object.fromEntries(formData)
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(form)
       });
 
-      const res = await fetch(url, { 
-        method, 
-        body: formData 
-      });
+      console.log("📥 Respuesta status:", res.status);
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Error al guardar producto");
+        const errorText = await res.text();
+        console.error("❌ Error del servidor:", errorText);
+        throw new Error(errorText || "Error al guardar la materia prima");
       }
+
+      const data = await res.json();
+      console.log("✅ Guardado exitoso:", data);
 
       onSave();
       handleClose();
     } catch (err) {
-      console.error("❌ Error al guardar producto:", err);
-      setError(err.message || "Error al guardar el producto");
+      console.error("💥 Error completo:", err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const quitarImagen = () => {
-    setForm({ ...form, imagen: null });
-    setPreview(null);
-  };
-
   return (
-    <Modal open={open} onClose={handleClose}>
-      <Box sx={modalStyle} component="form" onSubmit={handleSubmit}>
-        <Typography
-          variant="h5"
-          sx={{ mb: 3, fontWeight: "bold", color: "#e91e63" }}
-        >
-          {producto ? "Editar Producto" : "Crear Nuevo Producto"}
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Grid container spacing={2}>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        {materiaPrima ? "Editar Materia Prima" : "Crear Nueva Materia Prima"}
+      </DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        
+        <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="NOMBRE *"
+              label="Nombre *"
               name="nombre"
               value={form.nombre}
               onChange={handleChange}
               required
               size="small"
-              margin="normal"
-              placeholder="Ej: Coca-cola, Café Americano, etc."
             />
           </Grid>
 
@@ -231,215 +192,230 @@ const CreateProductModal = ({ open, handleClose, onSave, producto }) => {
             <TextField
               select
               fullWidth
-              label="CATEGORÍA *"
+              label="Categoría"
               name="categoria"
               value={form.categoria}
               onChange={handleChange}
-              required
               size="small"
-              margin="normal"
             >
               {categorias.map((cat) => (
-                <MenuItem key={cat} value={cat}>
-                  {cat}
-                </MenuItem>
+                <MenuItem key={cat} value={cat}>{cat}</MenuItem>
               ))}
             </TextField>
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <TextField
+              select
               fullWidth
-              label="PRECIO *"
-              name="precioVenta"
-              value={form.precioVenta}
+              label="Unidad de Medida *"
+              name="unidadMedida"
+              value={form.unidadMedida}
               onChange={handleChange}
-              type="number"
               required
               size="small"
-              margin="normal"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">$</InputAdornment>
-                ),
-              }}
-              placeholder="0.00"
-            />
+            >
+              {unidadesMedida.map((unidad) => (
+                <MenuItem key={unidad} value={unidad}>{unidad}</MenuItem>
+              ))}
+            </TextField>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
-              label="STOCK *"
+              label="Stock Actual *"
               name="stock"
               value={form.stock}
               onChange={handleChange}
               type="number"
               required
               size="small"
-              margin="normal"
-              placeholder="Cantidad disponible"
             />
           </Grid>
 
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <TextField
               fullWidth
-              label="PROVEEDOR"
-              name="proveedor"
-              value={form.proveedor}
+              label="Stock Mínimo *"
+              name="stockMinimo"
+              value={form.stockMinimo}
               onChange={handleChange}
+              type="number"
+              required
               size="small"
-              margin="normal"
-              placeholder="Opcional"
             />
           </Grid>
 
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ mt: 1, mb: 1, color: "text.secondary" }}>
-              IMAGEN DEL PRODUCTO
-            </Typography>
-            <Button
-              variant="outlined"
-              component="label"
+          <Grid item xs={12} sm={4}>
+            <TextField
               fullWidth
-              sx={{
-                borderColor: "#e91e63",
-                color: "#e91e63",
-                "&:hover": { 
-                  borderColor: "#c2185b",
-                  backgroundColor: "#fbe4e7"
-                },
+              label="Precio Unitario"
+              name="precioPromedioUnitario"
+              value={form.precioPromedioUnitario}
+              onChange={handleChange}
+              type="number"
+              size="small"
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
               }}
-            >
-              Seleccionar Imagen
-              <input
-                type="file"
-                hidden
-                accept="image/*"
-                name="imagen"
-                onChange={handleChange}
-              />
-            </Button>
-            {preview && (
-              <Box mt={2} textAlign="center" position="relative" display="inline-block">
-                <img
-                  src={preview}
-                  alt="Vista previa"
-                  style={{ 
-                    width: "120px", 
-                    height: "120px", 
-                    borderRadius: "8px",
-                    objectFit: "cover" 
-                  }}
-                />
-                <IconButton
-                  size="small"
-                  onClick={quitarImagen}
-                  sx={{
-                    position: "absolute",
-                    top: -8,
-                    right: -8,
-                    backgroundColor: "error.main",
-                    color: "white",
-                    "&:hover": {
-                      backgroundColor: "error.dark",
-                    },
-                  }}
-                >
-                  <Close />
-                </IconButton>
-              </Box>
-            )}
+            />
           </Grid>
         </Grid>
-
-        <Box sx={{ mt: 3, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            * Campos obligatorios
-          </Typography>
-        </Box>
-
-        <Button
-          type="submit"
-          variant="contained"
-          fullWidth
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose}>Cancelar</Button>
+        <Button 
+          onClick={handleSubmit} 
+          variant="contained" 
           disabled={loading}
-          sx={{
-            mt: 3,
-            backgroundColor: "#e91e63",
-            "&:hover": { backgroundColor: "#c2185b" },
-            fontWeight: "bold",
-            py: 1.5
-          }}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? "Guardando..." : (producto ? "ACTUALIZAR PRODUCTO" : "CREAR PRODUCTO")}
+          {loading ? "Guardando..." : (materiaPrima ? "Actualizar" : "Crear")}
         </Button>
-      </Box>
-    </Modal>
+      </DialogActions>
+    </Dialog>
   );
 };
 
-const InventarioProductos = () => {
+const ReporteInventarioMateriaPrima = () => {
   const [busqueda, setBusqueda] = useState("");
-  const [productos, setProductos] = useState([]);
+  const [materiasPrimas, setMateriasPrimas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [productoEdit, setProductoEdit] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  const [periodo, setPeriodo] = useState("hoy");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [materiaPrimaEdit, setMateriaPrimaEdit] = useState(null);
 
-  const cargarProductos = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const res = await fetch(`${API_BASE}/api/productos`);
-      if (!res.ok) throw new Error("Error al cargar productos");
-      const data = await res.json();
-      setProductos(data);
-    } catch (err) {
-      console.error('Error al cargar productos:', err);
-      setError('Error al cargar el inventario: ' + err.message);
-    } finally {
-      setLoading(false);
+  // Cargar materias primas DESDE EL BACKEND REAL
+  // Cargar materias primas DESDE EL BACKEND REAL
+const cargarMateriasPrimas = async () => {
+  try {
+    setLoading(true);
+    setError('');
+    
+    const token = localStorage.getItem("token");
+    console.log("🔐 Token:", token ? "Presente" : "Faltante");
+    
+    if (!token) {
+      throw new Error("No hay token de autenticación. Inicia sesión nuevamente.");
     }
+
+    // RUTA CORREGIDA: /api/materias-primas
+    const res = await fetch(`${API_BASE}/api/materias-primas`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    console.log("📥 Status respuesta:", res.status);
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Token inválido o expirado. Inicia sesión nuevamente.");
+      }
+      if (res.status === 403) {
+        throw new Error("No tienes permisos para ver las materias primas.");
+      }
+      if (res.status === 500) {
+        throw new Error("Error interno del servidor. Intenta nuevamente.");
+      }
+      throw new Error(`Error ${res.status}: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    console.log("✅ Materias primas cargadas:", data);
+    
+    setMateriasPrimas(data);
+    calcularEstadisticasAvanzadas(data);
+    
+  } catch (err) {
+    console.error('❌ Error al cargar materias primas:', err);
+    setError('Error al cargar el inventario: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Calcular estadísticas
+  const calcularEstadisticasAvanzadas = (datos) => {
+    const calcularStats = (data) => {
+      const totalMateriasPrimas = data.length;
+      const materiasPrimasBajoStock = data.filter(mp => mp.stock < mp.stockMinimo);
+      const materiasPrimasAgotadas = data.filter(mp => mp.stock === 0);
+      const materiasPrimasSuficientes = data.filter(mp => mp.stock >= mp.stockMinimo && mp.stock > 0);
+      
+      const valorTotalInventario = data.reduce((total, mp) => {
+        return total + (mp.stock * (mp.precioPromedioUnitario || 0));
+      }, 0);
+
+      return {
+        totalMateriasPrimas,
+        materiasPrimasBajoStock: materiasPrimasBajoStock.length,
+        materiasPrimasAgotadas: materiasPrimasAgotadas.length,
+        materiasPrimasSuficientes: materiasPrimasSuficientes.length,
+        valorTotalInventario,
+        porcentajeBajoStock: totalMateriasPrimas > 0 ? Math.round((materiasPrimasBajoStock.length / totalMateriasPrimas) * 100) : 0,
+        porcentajeAgotadas: totalMateriasPrimas > 0 ? Math.round((materiasPrimasAgotadas.length / totalMateriasPrimas) * 100) : 0
+      };
+    };
+
+    const stats = calcularStats(datos);
+    setEstadisticas({
+      hoy: stats,
+      semana: stats,
+      mes: stats,
+      año: stats
+    });
   };
 
-  const handleEliminar = async (producto) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar el producto "${producto.nombre}"?`)) {
+  const [estadisticas, setEstadisticas] = useState({
+    hoy: {}, semana: {}, mes: {}, año: {}
+  });
+
+  const statsActuales = estadisticas[periodo] || estadisticas.hoy;
+
+  // Funciones CRUD
+  const handleCrear = () => {
+    setMateriaPrimaEdit(null);
+    setModalOpen(true);
+  };
+
+  const handleEditar = (materia) => {
+    setMateriaPrimaEdit(materia);
+    setModalOpen(true);
+  };
+
+  const handleEliminar = async (materia) => {
+    if (window.confirm(`¿Estás seguro de eliminar "${materia.nombre}"?`)) {
       try {
-        const res = await fetch(`${API_BASE}/api/productos/${producto._id}`, { 
-          method: "DELETE" 
+        const token = localStorage.getItem("token");
+        
+        // RUTA CORREGIDA: /api/materias-primas
+        const res = await fetch(`${API_BASE}/api/materias-primas/${materia._id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
         });
-        if (!res.ok) throw new Error("Error al eliminar producto");
-        mostrarSnackbar("Producto eliminado correctamente", "success");
-        cargarProductos();
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Error al eliminar");
+        }
+        
+        mostrarSnackbar("Materia prima eliminada correctamente", "success");
+        cargarMateriasPrimas();
       } catch (err) {
-        console.error('Error al eliminar producto:', err);
-        mostrarSnackbar("Error al eliminar el producto", "error");
+        console.error("❌ Error al eliminar:", err);
+        mostrarSnackbar("Error al eliminar la materia prima: " + err.message, "error");
       }
     }
   };
 
-  useEffect(() => {
-    cargarProductos();
-  }, []);
-
-  const handleBuscar = (e) => {
-    const valor = e.target.value.toLowerCase();
-    setBusqueda(valor);
-  };
-
-  const handleEditar = (producto) => {
-    setProductoEdit(producto);
-    setDialogOpen(true);
-  };
-
-  const handleGuardarProducto = () => {
-    cargarProductos();
+  const handleGuardarMateriaPrima = () => {
+    cargarMateriasPrimas();
     mostrarSnackbar(
-      productoEdit ? "Producto actualizado correctamente" : "Producto creado correctamente", 
+      materiaPrimaEdit ? "Materia prima actualizada" : "Materia prima creada", 
       "success"
     );
   };
@@ -448,267 +424,264 @@ const InventarioProductos = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const productosFiltrados = productos.filter(
-    (p) =>
-      p.nombre?.toLowerCase().includes(busqueda) ||
-      (p.categoria && p.categoria.toLowerCase().includes(busqueda))
+  const materiasPrimasFiltradas = materiasPrimas.filter(mp =>
+    mp.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (mp.categoria && mp.categoria.toLowerCase().includes(busqueda.toLowerCase())) ||
+    (mp.unidadMedida && mp.unidadMedida.toLowerCase().includes(busqueda.toLowerCase()))
   );
 
-  const productosBajoStock = productos.filter(p => p.stock < 10);
-  const productosAgotados = productos.filter(p => p.stock === 0);
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN'
+    }).format(amount || 0);
+  };
+
+  useEffect(() => {
+    cargarMateriasPrimas();
+  }, []);
 
   if (loading) {
     return (
       <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
         <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Cargando materias primas...</Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3, backgroundColor: "white", borderRadius: 2, boxShadow: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <Box sx={{ p: 3, backgroundColor: "white", borderRadius: 2 }}>
+      {/* Header con botón de crear */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Inventario de Productos
+          <Typography variant="h4" fontWeight="bold" color="#2e7d32">
+            📊 Inventario - Materia Prima
           </Typography>
           <Typography variant="h6" color="text.secondary">
-            Control y seguimiento de existencias
+            Gestión completa de insumos con estadísticas
           </Typography>
         </Box>
-        <Button
-          startIcon={<Refresh />}
-          onClick={cargarProductos}
-          variant="outlined"
-        >
-          Actualizar
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            startIcon={<Refresh />}
+            onClick={cargarMateriasPrimas}
+            variant="outlined"
+            color="success"
+          >
+            Actualizar
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddCircle />}
+            sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}
+            onClick={handleCrear}
+          >
+            Nueva Materia Prima
+          </Button>
+        </Box>
       </Box>
 
       {error && (
-        <Alert 
-          severity="error" 
-          sx={{ mb: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={cargarProductos}>
-              Reintentar
-            </Button>
-          }
-        >
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
-      {/* Barra de búsqueda */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <TextField
-          placeholder="Buscar por nombre o categoría..."
-          variant="outlined"
-          value={busqueda}
-          onChange={handleBuscar}
-          size="small"
-          sx={{ width: "70%" }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search color="action" />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <Button
-          variant="contained"
-          startIcon={<AddCircle />}
-          sx={{
-            backgroundColor: "#e91e63",
-            "&:hover": { backgroundColor: "#c2185b" },
-            borderRadius: 2,
-          }}
-          onClick={() => {
-            setProductoEdit(null);
-            setDialogOpen(true);
-          }}
-        >
-          Nuevo Producto
-        </Button>
-      </Box>
-
-      {/* Tabla de productos */}
-      <TableContainer
-        component={Paper}
-        sx={{
-          border: "1px solid #f9d4da",
-          borderRadius: 2,
-          backgroundColor: "#fffafc",
-          mb: 3
-        }}
-      >
-        <Table>
-          <TableHead sx={{ backgroundColor: "#fbe4e7" }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Producto</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Categoría</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">Stock</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">Precio Venta</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">Estado</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {productosFiltrados.map((producto) => (
-              <TableRow
-                key={producto._id}
-                hover
-                sx={{
-                  "&:hover": { backgroundColor: "#fef2f4" },
+      {/* Filtros y búsqueda */}
+      <Card sx={{ mb: 3, backgroundColor: '#f8f9fa' }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6}>
+              <TextField
+                placeholder="Buscar por nombre, categoría o unidad..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                size="small"
+                fullWidth
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
                 }}
-              >
-                <TableCell>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    {producto.imagen ? (
-                      <img 
-                        src={`${API_BASE}${producto.imagen}`} 
-                        alt={producto.nombre}
-                        style={{ 
-                          width: "40px", 
-                          height: "40px", 
-                          objectFit: "cover",
-                          borderRadius: "4px"
-                        }}
-                      />
-                    ) : (
-                      <Inventory2 fontSize="small" color="action" />
-                    )}
-                    <Box>
-                      <Typography variant="body2" fontWeight="medium">
-                        {producto.nombre}
-                      </Typography>
-                      {producto.proveedor && (
-                        <Typography variant="caption" color="text.secondary">
-                          Proveedor: {producto.proveedor}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                </TableCell>
-                <TableCell>{producto.categoria || 'Sin categoría'}</TableCell>
-                <TableCell align="center">
-                  <Typography 
-                    variant="body2" 
-                    fontWeight="bold"
-                    color={producto.stock === 0 ? 'error.main' : producto.stock < 10 ? 'warning.main' : 'success.main'}
-                  >
-                    {producto.stock || 0} pza
-                  </Typography>
-                </TableCell>
-                <TableCell align="right">
-                  <Typography variant="body2" fontWeight="bold">
-                    ${producto.precioVenta?.toFixed(2) || '0.00'}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Chip
-                    label={getEstadoTexto(producto.stock)}
-                    color={getEstadoColor(producto.stock)}
-                    variant="outlined"
-                    size="small"
-                    icon={producto.stock < 10 ? <Warning /> : undefined}
-                  />
-                </TableCell>
-                <TableCell align="center">
-                  <IconButton 
-                    size="small" 
-                    color="primary"
-                    onClick={() => handleEditar(producto)}
-                  >
-                    <Edit />
-                  </IconButton>
-                  <IconButton 
-                    size="small" 
-                    color="error"
-                    onClick={() => handleEliminar(producto)}
-                  >
-                    <Delete />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Período de reporte</InputLabel>
+                <Select value={periodo} onChange={(e) => setPeriodo(e.target.value)} label="Período de reporte">
+                  <MenuItem value="hoy">Hoy</MenuItem>
+                  <MenuItem value="semana">Esta semana</MenuItem>
+                  <MenuItem value="mes">Este mes</MenuItem>
+                  <MenuItem value="año">Este año</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
-      {productosFiltrados.length === 0 && (
-        <Box textAlign="center" py={4}>
-          <Typography variant="h6" color="text.secondary">
-            No se encontraron productos
-          </Typography>
-        </Box>
-      )}
-
-      {/* Resumen general */}
-      <Divider sx={{ my: 3 }} />
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, textAlign: "center", backgroundColor: "#fdf3f5" }}>
-            <Typography variant="h6" fontWeight="bold">
-              Total de Productos
-            </Typography>
-            <Typography variant="h4" color="primary.main">
-              {productos.length}
-            </Typography>
-          </Paper>
+      {/* Estadísticas */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', backgroundColor: '#e3f2fd' }}>
+            <CardContent>
+              <Inventory fontSize="large" color="primary" />
+              <Typography variant="h4" fontWeight="bold" color="primary">
+                {statsActuales.totalMateriasPrimas || 0}
+              </Typography>
+              <Typography>Total Materias Primas</Typography>
+            </CardContent>
+          </Card>
         </Grid>
 
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, textAlign: "center", backgroundColor: "#fdf3f5" }}>
-            <Typography variant="h6" fontWeight="bold">
-              Stock Bajo
-            </Typography>
-            <Typography variant="h4" color="warning.main">
-              {productosBajoStock.length}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', backgroundColor: '#fff8e1' }}>
+            <CardContent>
+              <Warning fontSize="large" color="warning.main" />
+              <Typography variant="h4" fontWeight="bold" color="warning.main">
+                {statsActuales.materiasPrimasBajoStock || 0}
+              </Typography>
+              <Typography>Bajo Stock</Typography>
+              <Typography variant="body2" color="warning.main">
+                {statsActuales.porcentajeBajoStock || 0}% del total
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
 
-        <Grid item xs={12} sm={4}>
-          <Paper sx={{ p: 2, textAlign: "center", backgroundColor: "#fdf3f5" }}>
-            <Typography variant="h6" fontWeight="bold">
-              Agotados
-            </Typography>
-            <Typography variant="h4" color="error.main">
-              {productosAgotados.length}
-            </Typography>
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', backgroundColor: '#ffebee' }}>
+            <CardContent>
+              <TrendingDown fontSize="large" color="error" />
+              <Typography variant="h4" fontWeight="bold" color="error">
+                {statsActuales.materiasPrimasAgotadas || 0}
+              </Typography>
+              <Typography>Agotadas</Typography>
+              <Typography variant="body2" color="error">
+                {statsActuales.porcentajeAgotadas || 0}% del total
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ textAlign: 'center', backgroundColor: '#e8f5e8' }}>
+            <CardContent>
+              <AttachMoney fontSize="large" color="success.main" />
+              <Typography variant="h6" fontWeight="bold" color="success.main">
+                {formatCurrency(statsActuales.valorTotalInventario || 0)}
+              </Typography>
+              <Typography>Valor Inventario</Typography>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
-      {/* Modal para agregar/editar producto */}
-      <CreateProductModal
-        open={dialogOpen}
-        handleClose={() => setDialogOpen(false)}
-        onSave={handleGuardarProducto}
-        producto={productoEdit}
+      {/* Tabla con acciones */}
+      <Card>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6" color="primary">
+              Lista de Materias Primas
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {materiasPrimasFiltradas.length} de {materiasPrimas.length} registros
+            </Typography>
+          </Box>
+          
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#e8f5e8' }}>
+                  <TableCell sx={{ fontWeight: "bold" }}>Materia Prima</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Categoría</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">Unidad</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">Stock Actual</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">Stock Mínimo</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="right">Precio Unitario</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="right">Valor Total</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">Estado</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {materiasPrimasFiltradas.map((materia) => {
+                  const valorTotal = (materia.stock || 0) * (materia.precioPromedioUnitario || 0);
+                  return (
+                    <TableRow key={materia._id} hover>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <LocalGroceryStore fontSize="small" color="action" />
+                          <Typography variant="body2" fontWeight="medium">
+                            {materia.nombre}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>{materia.categoria || 'Sin categoría'}</TableCell>
+                      <TableCell align="center">{materia.unidadMedida}</TableCell>
+                      <TableCell align="center">
+                        <Typography 
+                          variant="body2" 
+                          fontWeight="bold"
+                          color={getEstadoColor(materia.stock, materia.stockMinimo)}
+                        >
+                          {materia.stock || 0}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">{materia.stockMinimo || 0}</TableCell>
+                      <TableCell align="right">{formatCurrency(materia.precioPromedioUnitario)}</TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight="bold">
+                          {formatCurrency(valorTotal)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={getEstadoTexto(materia.stock, materia.stockMinimo)}
+                          color={getEstadoColor(materia.stock, materia.stockMinimo)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton size="small" color="primary" onClick={() => handleEditar(materia)}>
+                          <Edit />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleEliminar(materia)}>
+                          <Delete />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {materiasPrimasFiltradas.length === 0 && (
+            <Box textAlign="center" py={4}>
+              <Typography variant="h6" color="text.secondary">
+                No se encontraron materias primas
+              </Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal */}
+      <MateriaPrimaModal
+        open={modalOpen}
+        handleClose={() => setModalOpen(false)}
+        onSave={handleGuardarMateriaPrima}
+        materiaPrima={materiaPrimaEdit}
       />
 
-      {/* Snackbar para notificaciones */}
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
-        <Alert 
-          severity={snackbar.severity} 
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-        >
+        <Alert severity={snackbar.severity}>
           {snackbar.message}
         </Alert>
       </Snackbar>
@@ -716,4 +689,4 @@ const InventarioProductos = () => {
   );
 };
 
-export default InventarioProductos;
+export default ReporteInventarioMateriaPrima;
