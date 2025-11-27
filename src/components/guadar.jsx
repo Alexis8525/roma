@@ -57,7 +57,7 @@ const InventarioProductos = () => {
   // --- Cargar datos desde la API ---
   const fetchProductos = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/materias-primas`, {
+      const res = await fetch(`${API_BASE_URL}/api/materiasprimas`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const data = await res.json();
@@ -75,7 +75,7 @@ const InventarioProductos = () => {
   // --- Guardar producto nuevo o editado ---
   const handleSave = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/materias-primas`, {
+      const res = await fetch(`${API_BASE_URL}/api/materiasprimas`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
